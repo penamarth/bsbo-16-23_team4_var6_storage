@@ -1,0 +1,70 @@
+@startuml
+actor Кладовщик
+
+Кладовщик -> StorageHouse : startAcceptance()
+activate StorageHouse
+
+StorageHouse -> DocWorks : createAcception()
+activate DocWorks
+DocWorks -> Acception : create()
+activate Acception
+Acception -> Batch : addBatch(description, quantity)
+activate Batch
+Batch -> Item : linkItem(description)
+activate Item
+Item --> Batch : reference
+deactivate Item
+Batch --> Acception : attach()
+deactivate Batch
+Acception --> DocWorks : done
+deactivate Acception
+
+DocWorks -> iReposDoc : save(Acception)
+activate iReposDoc
+iReposDoc -> docRepos : save(Acception)
+activate docRepos
+docRepos --> iReposDoc : ok
+deactivate docRepos
+iReposDoc --> DocWorks : ok
+deactivate iReposDoc
+
+
+loop for each Batch in Acception
+    StorageHouse -> Batch : getLinkedItem()
+    activate Batch
+    Batch --> StorageHouse : Item
+    deactivate Batch
+
+    StorageHouse -> iStorage : GetEmpty(Item)
+    activate iStorage
+    iStorage -> StorageComposit : GetEmpty(Item)
+    activate StorageComposit
+    StorageComposit -> StockRoom : GetEmpty(Item)
+    activate StockRoom
+    StockRoom -> StockShelf : GetEmpty(Item)
+    activate StockShelf
+    StockShelf -> StockCell : CanStore(Item)
+    activate StockCell
+    StockCell --> StockShelf : true/false
+    deactivate StockCell
+    StockShelf --> StockRoom : cellAddress
+    deactivate StockShelf
+    StockRoom --> StorageComposit : cellAddress
+    deactivate StockRoom
+    StorageComposit --> iStorage : cellAddress
+    deactivate StorageComposit
+    iStorage --> StorageHouse : cellAddress
+    deactivate iStorage
+
+    StorageHouse -> Кладовщик : show(Item.description, cellAddress)
+    Кладовщик -> StorageHouse : confirmPlacement(Item, cellAddress)
+
+    StorageHouse -> storRepos : recordPlacement(Item, cellAddress)
+    activate storRepos
+    storRepos --> StorageHouse : ok
+    deactivate storRepos
+end
+
+StorageHouse -> Кладовщик : showCompletionStatus()
+deactivate StorageHouse
+@enduml
