@@ -1,0 +1,75 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam classBorderColor black
+skinparam classBackgroundColor lightgrey
+skinparam classArrowColor #333333
+
+class StorageHouse{
+
+}
+interface iDoc{
+}
+class Item {
+    string description;
+}
+
+class DocWorks {
+
+}
+interface iReposDoc{
+
+}
+
+interface iStorage{
+}
+interface iReposStor{
+}
+class StockRoom {
+
+}
+
+class StockCell {
+
+}
+
+class StockShelf {
+
+}
+class storRepos{
+}
+class docRepos{
+}
+
+class Acception{
+}
+class AcceptItem{
+int quantity;
+}
+class Order{
+}
+
+
+abstract class StorageComposit{
+}
+
+' Связи между классами
+
+StorageHouse -left--> DocWorks
+StorageHouse -right---> Item
+DocWorks o---left iDoc
+iDoc<|..Acception
+iDoc<|..Order
+Acception *---right AcceptItem
+AcceptItem -up--> Item
+DocWorks -left--> iReposDoc
+iReposDoc <|..-down docRepos
+StorageHouse -right-->iReposStor
+StorageHouse -right-->iStorage
+iStorage <|.. StockCell
+iStorage <|.. StorageComposit
+StorageComposit o-up-> iStorage
+StorageComposit *---down StockShelf
+StorageComposit *---down StockRoom
+iReposStor<|..-down storRepos
+@enduml
