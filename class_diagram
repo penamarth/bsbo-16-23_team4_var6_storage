@@ -60,6 +60,12 @@ StorageHouse -right---> Item
 DocWorks o---left iDoc
 iDoc<|..Acception
 iDoc<|..Order
+iDoc<|..Сheckout
+iDoc<|..Defragmentation
+Checkout *--- iStorage
+Defragmentation *--- iStorage
+Order *---right ProcessOrderRaw
+ProcessOrderRaw -up--> Item
 Acception *---right AcceptItem
 AcceptItem -up--> Item
 DocWorks -left--> iReposDoc
@@ -69,7 +75,7 @@ StorageHouse -right-->iStorage
 iStorage <|.. StockCell
 iStorage <|.. StorageComposit
 StorageComposit o-up-> iStorage
-StorageComposit *---down StockShelf
-StorageComposit *---down StockRoom
+StorageComposit <|---down StockShelf
+StorageComposit <|---down StockRoom
 iReposStor<|..-down storRepos
 @enduml
