@@ -12,34 +12,41 @@ deactivate ExternalSystem
 
 StorageHouse -> Acceptance : startProcess(all_items_data)
 Acceptance -> Batch : createBatch(items_data)
+loop для каждого Item
 Batch -> Item : craeteItem()
 Item -> Batch : item
+end
 Batch -> Acceptance : items
-Acceptance -> iStorage : getEmpty(item)
 
-iStorage -> StorageComposit : GetEmpty(Item)
-activate StorageComposit
-StorageComposit -> StockHouse : GetEmpty(Item)
-activate StockHouse
-StorageComposit -> StockRoom : GetEmpty(Item)
-activate StockRoom
-StockRoom -> StockRack : GetEmpty(Item)
-activate StockRack
-StockRack -> StockCell : CanStore(Item)
-activate StockCell
-StockCell --> StockRack : true/false
-deactivate StockCell
-StockRack --> StockRoom : cellAddress
-deactivate StockRack
-StockRoom --> StockHouse: rackAddress
-deactivate StockRoom
-StockHouse -> StorageComposit : roomAddress
-StorageComposit --> Acceptance : address
-deactivate StorageComposit
-deactivate iStorage
 
-Acceptance -> storRepos : savePlacement(item, adress)
-storRepos -> Acceptance : placement_id
+loop для каждого Item
+    Acceptance -> iStorage : getEmpty(item)
+    activate iStorage
+    iStorage -> StorageComposit : GetEmpty(Item)
+    activate StorageComposit
+    StorageComposit -> StockHouse : GetEmpty(Item)
+    activate StockHouse
+    StockHouse -> StockRoom : GetEmpty(Item)
+    activate StockRoom
+    StockRoom -> StockRack : GetEmpty(Item)
+    activate StockRack
+    StockRack -> StockCell : CanStore(Item)
+    activate StockCell
+    StockCell --> StockRack : true/false
+    deactivate StockCell
+    StockRack --> StockRoom : cellAddress
+    deactivate StockRack
+    StockRoom --> StockHouse: rackAddress
+    deactivate StockRoom
+    StockHouse -> StorageComposit : roomAddress
+    StorageComposit --> Acceptance : address
+    deactivate StockHouse
+    deactivate StorageComposit
+    deactivate iStorage
+
+    Acceptance -> storRepos : savePlacement(item, address)
+    storRepos -> Acceptance : placement_id
+end
 
 Acceptance -> DocWorks : createDocument(acceptance_data)
 DocWorks -> AcceptanceDoc : createAcceptance(items, storage_adresses)
@@ -47,9 +54,8 @@ AcceptanceDoc -> DocWorks : document
 DocWorks -> docRepos : saveDocument(document)
 docRepos -> DocWorks : document_id
 
-DocWorks -> Acceptance : 1
+DocWorks -> Acceptance : document_id
 Acceptance -> StorageHouse : (items, adresses, documents_id)
 
 StorageHouse -> Оператор : информация о завершении
-
 @enduml
