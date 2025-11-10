@@ -1,81 +1,101 @@
 @startuml
-skinparam classAttributeIconSize 0
-skinparam classFontSize 12
-skinparam classBorderColor black
-skinparam classBackgroundColor lightgrey
-skinparam classArrowColor #333333
+scale 2
+!define BOUNDED_CONTEXT(name) rectangle name <<Ограниченный контекст>>
+!define AGGREGATE(name) rectangle name <<Агрегат>>
 
-class StorageHouse{
-
+skinparam <<Ограниченный контекст>>{
+    roundcorner 100
+    PackageTitleAlignment 60
 }
-interface iDoc{
-}
-class Item {
-    string description;
-}
-
-class DocWorks {
-
-}
-interface iReposDoc{
+BOUNDED_CONTEXT("Внешняя_Система"){
+    class ExternalSystem {
+        - externalId: String
+        + getExternalData()
+    }
 
 }
 
-interface iStorage{
+
+BOUNDED_CONTEXT("Процессы_склада") as RegisterContext {
+    class StorageHouse
+    interface iProcess
+
+    class Acceptance
+    class Order
+    class Defragmentation
+    class Checkout
+
+    iProcess <|.. Acceptance
+    iProcess <|.. Order
+    iProcess <|.. Defragmentation
+    iProcess <|.. Checkout
+    StorageHouse -- iProcess
+
+    AGGREGATE("Элементы") {
+        class Batch
+        class Item
+        Item <|--up Batch
+    }
+
+    Acceptance o-- Batch
+    Order o-- Batch
+
+
 }
-interface iReposStor{
-}
-class StockRoom {
+' === Документооборот ===
+BOUNDED_CONTEXT("Документооборот") {
+    AGGREGATE("Документы"){
+    interface iDoc
+
+    class DocWorks
+    class AcceptanceDoc
+    class OrderDoc
+    class DefragmentationDoc
+    class CheckoutDoc
+    
+    iDoc <|.. AcceptanceDoc
+    iDoc <|.. OrderDoc
+    iDoc <|.. DefragmentationDoc
+    iDoc <|.. CheckoutDoc
+    }
+
+    AGGREGATE("Храненилище_расположения"){
+        interface iReposDoc
+        class docRepos
+        iReposDoc <|-- docRepos
+    }
+    DocWorks --> iDoc
+    DocWorks --> iReposDoc
 
 }
 
-class StockCell {
+BOUNDED_CONTEXT("Расположение_элементов") {
+    AGGREGATE("Расположение") {
+        interface iStorage
 
+        class StockCell
+        class StorageComposit
+        class StockShelf
+        class StockRoom
+        class StockRack
+
+        iStorage <|.. StockCell
+        iStorage <|.. StorageComposit
+        StorageComposit o-up-> iStorage
+        StorageComposit <|---down StockShelf
+        StorageComposit <|---down StockRoom
+        StorageComposit <|---down StockRack
+    }
+    AGGREGATE("Храненилище_расположения") {
+        interface iReposStor
+        class storRepos
+        iReposStor <|-- storRepos
+
+   }
 }
 
-class StockShelf {
-
-}
-class storRepos{
-}
-class docRepos{
-}
-
-class Acception{
-}
-class AcceptItem{
-int quantity;
-}
-class Order{
-}
-
-
-abstract class StorageComposit{
-}
-
-' Связи между классами
-
-StorageHouse -left--> DocWorks
-StorageHouse -right---> Item
-DocWorks o---left iDoc
-iDoc<|..Acception
-iDoc<|..Order
-iDoc<|..Сheckout
-iDoc<|..Defragmentation
-Checkout *--- iStorage
-Defragmentation *--- iStorage
-Order *---right ProcessOrderRaw
-ProcessOrderRaw -up--> Item
-Acception *---right AcceptItem
-AcceptItem -up--> Item
-DocWorks -left--> iReposDoc
-iReposDoc <|..-down docRepos
-StorageHouse -right-->iReposStor
-StorageHouse -right-->iStorage
-iStorage <|.. StockCell
-iStorage <|.. StorageComposit
-StorageComposit o-up-> iStorage
-StorageComposit <|---down StockShelf
-StorageComposit <|---down StockRoom
-iReposStor<|..-down storRepos
+StorageHouse -left-> ExternalSystem
+iProcess -up--> DocWorks
+iProcess --> iStorage
+iStorage --> iReposStor
 @enduml
