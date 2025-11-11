@@ -1,0 +1,50 @@
+@startuml
+actor Оператор
+
+Оператор -> StorageHouse :  startDefragmentation(id, manager, date)
+activate StorageHouse
+
+
+StorageHouse -> Defragmentation : startProcess(all_items_data)
+
+
+loop для каждого Item
+    Defragmentation -> iStorage : getEmpty(item)
+    activate iStorage
+    iStorage -> StorageComposit : Defragment(Item)
+    activate StorageComposit
+    StorageComposit -> StockHouse : Defragment(Item)
+    activate StockHouse
+    StockHouse -> StockRoom : Defragment(Item)
+    activate StockRoom
+    StockRoom -> StockRack : Defragment(Item)
+    activate StockRack
+    StockRack -> StockCell : CanStore(Item)
+    activate StockCell
+    StockCell --> StockRack : true/false
+    deactivate StockCell
+    StockRack --> StockRoom : cellAddress
+    deactivate StockRack
+    StockRoom --> StockHouse: rackAddress
+    deactivate StockRoom
+    StockHouse -> StorageComposit : roomAddress
+    StorageComposit --> Defragmentation : address
+    deactivate StockHouse
+    deactivate StorageComposit
+    deactivate iStorage
+
+    Defragmentation -> storRepos : updatePlacement(item, address)
+    storRepos -> Defragmentation : placement_id
+end
+
+Defragmentation -> DocWorks : createDocument(defragmentation_data)
+DocWorks -> DefragmentationDoc : createDefragmentation(items, storage_adresses)
+DefragmentationDoc -> DocWorks : document
+DocWorks -> docRepos : saveDocument(document)
+docRepos -> DocWorks : document_id
+
+DocWorks -> Defragmentation : document_id
+Defragmentation -> StorageHouse : (items, adresses, documents_id)
+
+StorageHouse -> Оператор : информация о завершении
+@enduml
