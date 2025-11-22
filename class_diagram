@@ -1,26 +1,43 @@
 @startuml
-scale 2
+scale 1
 !define BOUNDED_CONTEXT(name) rectangle name <<Ограниченный контекст>>
 !define AGGREGATE(name) rectangle name <<Агрегат>>
 
 skinparam <<Ограниченный контекст>>{
     roundcorner 100
-    PackageTitleAlignment 60
+    PackageTitleAlignment 30
 }
-BOUNDED_CONTEXT("Внешняя_Система"){
-    class ExternalSystem {
-        - externalId: String
-        + getExternalData()
+
+BOUNDED_CONTEXT("Процессы_склада") {
+    class StorageHouse {
+        - type : string
+        - inputStrategy : iDataInputStrategy
+        - process : iProcess
+        - root : StorageRoot
+        + StartProcess() : void
     }
 
-}
+    class StorageExecutor {
+        - house : IStorage
+        + StorageExecutor(house : IStorage)
+        + StartProcess(process : iProcess, data : string) : void
+    }
 
+    interface iProcess {
+        + Parse(data : string) : void
+        + ExecuteStorageLogic(house : IStorage) : void
+    }
 
-BOUNDED_CONTEXT("Процессы_склада") as RegisterContext {
-    class StorageHouse
-    interface iProcess
+    class Acceptance {
+        - batchId : string
+        - date : string
+        - producer : string
+        - manager : string
+        - items : List<Item>
+        + Parse(data : string) : void
+        + ExecuteStorageLogic(house : IStorage) : void
+    }
 
-    class Acceptance
     class Order
     class Defragmentation
     class Checkout
@@ -29,73 +46,115 @@ BOUNDED_CONTEXT("Процессы_склада") as RegisterContext {
     iProcess <|.. Order
     iProcess <|.. Defragmentation
     iProcess <|.. Checkout
-    StorageHouse -- iProcess
 
-    AGGREGATE("Элементы") {
-        class Batch
-        class Item
-        Item <|--up Batch
+    StorageExecutor --> iProcess
+    StorageExecutor --> StorageHouse
+    StorageHouse --> iProcess
+
+    class Item {
+        + Name : string
+        + Quantity : string
     }
 
-    Acceptance o-- Batch
-    Order o-- Batch
-
-
+    Acceptance o-- Item
 }
-' === Документооборот ===
-BOUNDED_CONTEXT("Документооборот") {
-    AGGREGATE("Документы"){
-    interface iDoc
 
-    class DocWorks
-    class AcceptanceDoc
-    class OrderDoc
-    class DefragmentationDoc
-    class CheckoutDoc
-    
-    iDoc <|.. AcceptanceDoc
-    iDoc <|.. OrderDoc
-    iDoc <|.. DefragmentationDoc
-    iDoc <|.. CheckoutDoc
+BOUNDED_CONTEXT("Получение_данных") {
+    interface iDataInputStrategy {
+        + GetData() : string
     }
 
-    AGGREGATE("Храненилище_расположения"){
+    class ExternalSystemInput {
+        + GetData() : string
+    }
+    class QRCodeInput {
+        + GetData() : string
+    }
+    class ManualInput {
+        + GetData() : string
+    }
+
+    iDataInputStrategy <|.. ExternalSystemInput
+    iDataInputStrategy <|.. QRCodeInput
+    iDataInputStrategy <|.. ManualInput
+    StorageHouse --> iDataInputStrategy
+}
+
+BOUNDED_CONTEXT("Документооборот") {
+    AGGREGATE("Документы") {
+        interface iDoc
+        class DocWorks
+        class AcceptanceDoc
+        class OrderDoc
+        class DefragmentationDoc
+        class CheckoutDoc
+
+        iDoc <|.. AcceptanceDoc
+        iDoc <|.. OrderDoc
+        iDoc <|.. DefragmentationDoc
+        iDoc <|.. CheckoutDoc
+    }
+
+    AGGREGATE("Храненилище_расположения") {
         interface iReposDoc
         class docRepos
         iReposDoc <|-- docRepos
     }
+
     DocWorks --> iDoc
     DocWorks --> iReposDoc
-
 }
 
 BOUNDED_CONTEXT("Расположение_элементов") {
     AGGREGATE("Расположение") {
-        interface iStorage
+        interface IStorage {
+            + CanStore() : bool
+            + GetEmpty(path : string) : string?
+        }
 
-        class StockCell
-        class StorageComposit
-        class StockShelf
-        class StockRoom
-        class StockRack
+        class StorageComposite {
+            - children : List<IStorage>
+            + CanStore() : bool
+            + GetEmpty(path : string) : string?
+        }
 
-        iStorage <|.. StockCell
-        iStorage <|.. StorageComposit
-        StorageComposit o-up-> iStorage
-        StorageComposit <|---down StockShelf
-        StorageComposit <|---down StockRoom
-        StorageComposit <|---down StockRack
+        class StorageCell {
+            - id : string
+            - isOccupied : bool
+            + CanStore() : bool
+            + GetEmpty(path : string) : string?
+        }
+
+        class StorageShelf {
+            - shelfId : string
+            + AddCell(cell : StorageCell) : void
+            + GetEmpty(path : string) : string?
+        }
+
+        class StorageRoom {
+            - roomId : string
+            + AddShelf(shelf : StorageShelf) : void
+            + GetEmpty(path : string) : string?
+        }
+
+        class StorageRoot {
+            + StorageRoot(roomsCount : int, shelvesPerRoom : int, cellsPerShelf : int)
+        }
+
+        IStorage <|.. StorageCell
+        IStorage <|.. StorageComposite
+        StorageComposite <|-- StorageShelf
+        StorageComposite <|-- StorageRoom
+        StorageComposite <|-- StorageRoot
     }
+
     AGGREGATE("Храненилище_расположения") {
         interface iReposStor
         class storRepos
         iReposStor <|-- storRepos
-
-   }
+    }
 }
 
-StorageHouse -left-> ExternalSystem
-iProcess -up--> DocWorks
-iProcess --> iStorage
-iStorage --> iReposStor
+iProcess --> IStorage
+IStorage --> iReposStor
 @enduml
