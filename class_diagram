@@ -14,18 +14,25 @@ BOUNDED_CONTEXT("Процессы_склада") {
         - inputStrategy : iDataInputStrategy
         - process : iProcess
         - root : StorageRoot
-        + StartProcess() : void
+        - storageExecutor : StorageExecutor
+        - docWorks : DocWorks
+        + StorageHouse()
+        - getProcessType() : void
+        - getInputStrategy() : void
+        - getMetaData() : string
+        + ExecuteProcess() : void
     }
 
     class StorageExecutor {
         - house : IStorage
-        + StorageExecutor(house : IStorage)
-        + StartProcess(process : iProcess, data : string) : void
+        - storbd : iReposStor
+        + StorageExecutor(house : IStorage, storbd : iReposStor)
+        + ExecuteProcess(process : iProcess, data : string) :\n Dictionary<Item,string>
     }
 
     interface iProcess {
         + Parse(data : string) : void
-        + ExecuteStorageLogic(house : IStorage) : void
+        + ExecuteStorageLogic(house : IStorage)\n : Dictionary<Item,string>
     }
 
     class Acceptance {
@@ -34,8 +41,9 @@ BOUNDED_CONTEXT("Процессы_склада") {
         - producer : string
         - manager : string
         - items : List<Item>
+        - payload : Dictionary<Item,string>
         + Parse(data : string) : void
-        + ExecuteStorageLogic(house : IStorage) : void
+        + ExecuteStorageLogic(house : IStorage):\n Dictionary<Item,string>
     }
 
     class Order
@@ -82,9 +90,20 @@ BOUNDED_CONTEXT("Получение_данных") {
 
 BOUNDED_CONTEXT("Документооборот") {
     AGGREGATE("Документы") {
-        interface iDoc
-        class DocWorks
-        class AcceptanceDoc
+        interface iDoc {
+            + Create(metad : string,\n payload : Dictionary<Item,string>) : string
+        }
+
+        class DocWorks {
+            - doc : iDoc
+            - docbd : iReposDoc
+            + DocWorks(doc : iDoc, docbd : iReposDoc)
+            + createDocument(metad : string,\n payload : Dictionary<Item,string>) : string
+            + saveDocument(document : string) : bool
+        }
+        class AcceptanceDoc {
+            + Create(metad : string,\n payload : Dictionary<Item,string>) : string
+        }
         class OrderDoc
         class DefragmentationDoc
         class CheckoutDoc
@@ -96,12 +115,17 @@ BOUNDED_CONTEXT("Документооборот") {
     }
 
     AGGREGATE("Храненилище_расположения") {
-        interface iReposDoc
-        class docRepos
-        iReposDoc <|-- docRepos
+        interface iReposDoc {
+            + SaveDocument(document : string) : bool
+        }
+        class docRepos {
+            + docRepos()
+            + SaveDocument(document : string) : bool
+        }
+        iReposDoc <|.. docRepos
     }
 
-    DocWorks --> iDoc
+    DocWorks -> iDoc
     DocWorks --> iReposDoc
 }
 
@@ -138,7 +162,7 @@ BOUNDED_CONTEXT("Расположение_элементов") {
         }
 
         class StorageRoot {
-            + StorageRoot(roomsCount : int, shelvesPerRoom : int, cellsPerShelf : int)
+            + StorageRoot(roomsCount : int,\n shelvesPerRoom : int, cellsPerShelf : int)
         }
 
         IStorage <|.. StorageCell
@@ -146,20 +170,25 @@ BOUNDED_CONTEXT("Расположение_элементов") {
         StorageComposite <|-- StorageShelf
         StorageComposite <|-- StorageRoom
         StorageComposite <|-- StorageRoot
-
     }
 
     AGGREGATE("Храненилище_расположения") {
-        interface iReposStor
-        class storRepos
-        iReposStor <|-- storRepos
+        interface iReposStor {
+            + SaveToPlacement(data:\n Dictionary<Item,string>) : bool
+        }
+        class storRepos {
+            + storRepos()
+            + SaveToPlacement(data:\n Dictionary<Item,string>) : bool
+        }
+        iReposStor <|.. storRepos
     }
+
     StorageHouse  --> StorageRoot
     StorageExecutor --> IStorage
     StorageHouse  --> storRepos
     StorageExecutor --> iReposStor
     StorageHouse -- docRepos
     StorageHouse -- DocWorks
-    StorageHouse -->AcceptanceDoc
+    StorageHouse --> AcceptanceDoc
 }
 @enduml
