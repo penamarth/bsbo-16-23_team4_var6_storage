@@ -114,7 +114,7 @@ BOUNDED_CONTEXT("Документооборот") {
         iDoc <|.. CheckoutDoc
     }
 
-    AGGREGATE("Храненилище_расположения") {
+    AGGREGATE("Хранилище_расположения") {
         interface iReposDoc {
             + SaveDocument(document : string) : bool
         }
@@ -172,7 +172,7 @@ BOUNDED_CONTEXT("Расположение_элементов") {
         StorageComposite <|-- StorageRoot
     }
 
-    AGGREGATE("Храненилище_расположения") {
+    AGGREGATE("Хранилище_расположения") {
         interface iReposStor {
             + SaveToPlacement(data:\n Dictionary<Item,string>) : bool
         }
