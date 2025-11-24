@@ -1,50 +1,81 @@
 @startuml
 actor Оператор
 
-Оператор -> StorageHouse :  startDefragmentation(id, manager, date)
+Оператор -> StorageHouse : ExecuteProcess()
 activate StorageHouse
 
+StorageHouse -> iDataInputStrategy : GetData()
+activate iDataInputStrategy
+iDataInputStrategy --> StorageHouse : data
+deactivate iDataInputStrategy
 
-StorageHouse -> Defragmentation : startProcess(all_items_data)
+StorageHouse -> StorageExecutor : ExecuteProcess(process, data)
+activate StorageExecutor
 
+StorageExecutor -> iProcess : Parse(data)
+activate iProcess
+iProcess --> StorageExecutor : void
+deactivate iProcess
+
+StorageExecutor -> iProcess : ExecuteStorageLogic(house)
+activate iProcess
 
 loop для каждого Item
-    Defragmentation -> iStorage : getEmpty(item)
-    activate iStorage
-    iStorage -> StorageComposit : Defragment(Item)
-    activate StorageComposit
-    StorageComposit -> StockHouse : Defragment(Item)
-    activate StockHouse
-    StockHouse -> StockRoom : Defragment(Item)
-    activate StockRoom
-    StockRoom -> StockRack : Defragment(Item)
-    activate StockRack
-    StockRack -> StockCell : CanStore(Item)
-    activate StockCell
-    StockCell --> StockRack : true/false
-    deactivate StockCell
-    StockRack --> StockRoom : cellAddress
-    deactivate StockRack
-    StockRoom --> StockHouse: rackAddress
-    deactivate StockRoom
-    StockHouse -> StorageComposit : roomAddress
-    StorageComposit --> Defragmentation : address
-    deactivate StockHouse
-    deactivate StorageComposit
-    deactivate iStorage
-
-    Defragmentation -> storRepos : updatePlacement(item, address)
-    storRepos -> Defragmentation : placement_id
+    iProcess -> IStorage : GetEmpty("Warehouse")
+    activate IStorage
+    IStorage -> StorageComposite : Defragment(path)
+    activate StorageComposite
+    StorageComposite -> StorageRoot : Defragment(path)
+    activate StorageRoot
+    StorageRoot -> StorageRoom : Defragment(path)
+    activate StorageRoom
+    StorageRoom -> StorageShelf : Defragment(path)
+    activate StorageShelf
+    StorageShelf -> StorageCell : Defragment(path)
+    activate StorageCell
+    StorageCell --> StorageShelf : cellAddress / null
+    deactivate StorageCell
+    StorageShelf --> StorageRoom : shelfAddress / null
+    deactivate StorageShelf
+    StorageRoom --> StorageRoot : roomAddress / null
+    deactivate StorageRoom
+    StorageRoot --> StorageComposite : rootAddress / null
+    deactivate StorageRoot
+    StorageComposite --> IStorage : address / null
+    deactivate StorageComposite
+    IStorage --> iProcess : address / null
+    deactivate IStorage
 end
 
-Defragmentation -> DocWorks : createDocument(defragmentation_data)
-DocWorks -> DefragmentationDoc : createDefragmentation(items, storage_adresses)
-DefragmentationDoc -> DocWorks : document
-DocWorks -> docRepos : saveDocument(document)
-docRepos -> DocWorks : document_id
+iProcess --> StorageExecutor : payload (Dictionary<Item,string>)
+deactivate iProcess
 
-DocWorks -> Defragmentation : document_id
-Defragmentation -> StorageHouse : (items, adresses, documents_id)
+StorageExecutor -> iReposStor : UpdatePlacement(payload)
+activate iReposStor
+iReposStor --> StorageExecutor : true
+deactivate iReposStor
 
-StorageHouse -> Оператор : информация о завершении
+StorageExecutor --> StorageHouse : payload
+deactivate StorageExecutor
+
+StorageHouse -> DocWorks : createDocument(metad, payload)
+activate DocWorks
+DocWorks -> iDoc : Create(metad, payload)
+activate iDoc
+iDoc --> DocWorks : document (string)
+deactivate iDoc
+DocWorks --> StorageHouse : document
+deactivate DocWorks
+
+StorageHouse -> DocWorks : saveDocument(document)
+activate DocWorks
+DocWorks -> iReposDoc : SaveDocument(document)
+activate iReposDoc
+iReposDoc --> DocWorks : true
+deactivate iReposDoc
+DocWorks --> StorageHouse : true
+deactivate DocWorks
+
+StorageHouse --> Оператор : Завершение процесса (payload, document_id)
+deactivate StorageHouse
 @enduml
