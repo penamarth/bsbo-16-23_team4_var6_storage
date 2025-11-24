@@ -48,8 +48,8 @@ BOUNDED_CONTEXT("Процессы_склада") {
     iProcess <|.. Checkout
 
     StorageExecutor --> iProcess
-    StorageExecutor --> StorageHouse
-    StorageHouse --> iProcess
+    StorageHouse --> StorageExecutor 
+    StorageHouse --> Acceptance
 
     class Item {
         + Name : string
@@ -77,7 +77,7 @@ BOUNDED_CONTEXT("Получение_данных") {
     iDataInputStrategy <|.. ExternalSystemInput
     iDataInputStrategy <|.. QRCodeInput
     iDataInputStrategy <|.. ManualInput
-    StorageHouse --> iDataInputStrategy
+    StorageHouse -up-> iDataInputStrategy
 }
 
 BOUNDED_CONTEXT("Документооборот") {
@@ -146,6 +146,7 @@ BOUNDED_CONTEXT("Расположение_элементов") {
         StorageComposite <|-- StorageShelf
         StorageComposite <|-- StorageRoom
         StorageComposite <|-- StorageRoot
+
     }
 
     AGGREGATE("Храненилище_расположения") {
@@ -153,8 +154,12 @@ BOUNDED_CONTEXT("Расположение_элементов") {
         class storRepos
         iReposStor <|-- storRepos
     }
+    StorageHouse  --> StorageRoot
+    StorageExecutor --> IStorage
+    StorageHouse  --> storRepos
+    StorageExecutor --> iReposStor
+    StorageHouse -- docRepos
+    StorageHouse -- DocWorks
+    StorageHouse -->AcceptanceDoc
 }
-
-iProcess --> IStorage
-IStorage --> iReposStor
 @enduml
