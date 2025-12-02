@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 
 
@@ -6,6 +6,8 @@ public interface IStorage
 {
     bool CanStore();              // проверка, можно ли хранить
     string? GetEmpty(string path); // поиск пустого места
+
+    string ? Find(Item goods, string path);
 }
 
 public abstract class StorageComposite : IStorage
@@ -30,17 +32,29 @@ public abstract class StorageComposite : IStorage
         }
         return null;
     }
+    public virtual string? Find(Item goods, string path)
+    {
+        foreach (var child in children)
+        {
+            var result = child.Find(goods, path);
+            if (result != null)
+                return result;
+        }
+        return null;
+    }
 }
 
 public class StorageCell : IStorage
 {
     private bool isOccupied;
     private readonly string id;
+    private Item content;
 
     public StorageCell(string id)
     {
         this.id = id;
         isOccupied = false;
+        content = null;
     }
 
     public bool CanStore() => !isOccupied;
@@ -52,6 +66,17 @@ public class StorageCell : IStorage
         {
             isOccupied = true;
             Console.WriteLine($"Выделена: {path}/{id}");
+            return $"{path}/{id}";
+        }
+        return null;
+    }
+    public string? Find(Item goods, string path)
+    {
+        Console.WriteLine($"Проверка ячейки {path}/{id}");
+        if (isOccupied && goods == content)
+        {
+            isOccupied = false;
+            Console.WriteLine($"Товар извлечен из ячейки: {path}/{id}");
             return $"{path}/{id}";
         }
         return null;
@@ -73,6 +98,12 @@ public class StorageShelf : StorageComposite
         Console.WriteLine($"Входим на стеллаж {path}/{shelfId}");
         return base.GetEmpty($"{path}/{shelfId}");
     }
+
+    public override string? Find(Item goods, string path)
+    {
+        Console.WriteLine($"Входим на стеллаж {path}/{shelfId}");
+        return base.Find(goods, path);
+    }
 }
 public class StorageRoom : StorageComposite
 {
@@ -89,6 +120,12 @@ public class StorageRoom : StorageComposite
     {
         Console.WriteLine($"Входим в комнату {roomId}");
         return base.GetEmpty(roomId);
+    }
+
+    public override string? Find(Item goods, string path)
+    {
+        Console.WriteLine($"Входим в комнату {roomId}");
+        return base.Find(goods, roomId);
     }
 }
 public class StorageRoot : StorageComposite
@@ -119,14 +156,15 @@ public interface iReposStor
 {
     public bool SaveToPlacement(Dictionary<Item, string> data);
 }
-public class storRepos: iReposStor
+public class storRepos : iReposStor
 {
     public storRepos()
     {
         Console.WriteLine("Подключение к бд  расположений... ");
         Thread.Sleep(2000);
     }
-    public bool SaveToPlacement(Dictionary<Item, string> data) {
+    public bool SaveToPlacement(Dictionary<Item, string> data)
+    {
         Console.WriteLine($"Товары записаны в бд");
         return true;
 
@@ -153,7 +191,7 @@ public class docRepos : iReposDoc
 }
 public interface iDoc
 {
-    public string Create(string metad,Dictionary<Item, string> payload);
+    public string Create(string metad, Dictionary<Item, string> payload);
 }
 public class AcceptanceDoc : iDoc
 {
@@ -172,6 +210,24 @@ public class AcceptanceDoc : iDoc
         return document;
     }
 }
+
+public class OrderDoc : iDoc
+{
+    public string Create(string metad, Dictionary<Item, string> payload)
+    {
+        Console.WriteLine("Создаем документ");
+        Thread.Sleep(1000);
+        string document = $"Был принят ЗАКАЗ товаров:\nМетаданные: {metad}\n";
+        foreach (var item in payload)
+        {
+            string t_item = $"Item: {item.Key.Name}-{item.Key.Quantity}  adress: {item.Value}\n";
+            document += t_item;
+        }
+        Console.WriteLine("Создан документ ЗАКАЗ");
+        Console.WriteLine(document);
+        return document;
+    }
+}
 public class DocWorks
 {
     private iDoc doc;
@@ -185,7 +241,7 @@ public class DocWorks
     {
         string document = doc.Create(metad, payload);
         return document;
-    } 
+    }
     public bool saveDocument(string document)
     {
         docbd.SaveDocument(document);
@@ -285,7 +341,7 @@ public class Acceptance : iProcess
         }
     }
 
-    public Dictionary<Item,string> ExecuteStorageLogic(IStorage house)
+    public Dictionary<Item, string> ExecuteStorageLogic(IStorage house)
     {
         Console.WriteLine($"Приемка поставки №{batchId}");
         Console.WriteLine($"Дата: {date}");
@@ -306,6 +362,78 @@ public class Acceptance : iProcess
             else
             {
                 Console.WriteLine("Нет свободных ячеек для размещения");
+            }
+        }
+        return payload;
+    }
+}
+
+
+public class Order : iProcess
+{
+    private string batchId;
+    private string date;
+    private string customer;
+    private string executor;
+
+    private List<Item> items = new List<Item>();
+    public Dictionary<Item, string> payload = new Dictionary<Item, string>();
+
+    public void Parse(string data)
+    {
+        var parts = data.Split(';');
+        var dict = new Dictionary<string, string>();
+
+        foreach (var part in parts)
+        {
+            var kv = part.Split('=');
+            if (kv.Length == 2)
+                dict[kv[0]] = kv[1];
+        }
+
+        batchId = dict.ContainsKey("batch") ? dict["batch"] : "не указан";
+        date = dict.ContainsKey("date") ? dict["date"] : "не указана";
+        customer = dict.ContainsKey("customer") ? dict["customer"] : "не указан";
+        executor = dict.ContainsKey("executor") ? dict["executor"] : "не указан";
+
+        if (dict.ContainsKey("items"))
+        {
+            foreach (var item in dict["items"].Split(','))
+            {
+                var kv = item.Split(':');
+                if (kv.Length == 2)
+                {
+                    items.Add(new Item
+                    {
+                        Name = kv[0].Trim(),
+                        Quantity = kv[1].Trim()
+                    });
+                }
+            }
+        }
+    }
+
+    public Dictionary<Item, string> ExecuteStorageLogic(IStorage house)
+    {
+        Console.WriteLine($"Заказ №{batchId}");
+        Console.WriteLine($"Дата: {date}");
+        Console.WriteLine($"Заказчик: {customer}");
+        Console.WriteLine($"Ответственный: {executor}");
+        Console.WriteLine("Список товаров:");
+        foreach (var item in items)
+        {
+            Console.WriteLine($"- {item.Name}, {item.Quantity}");
+            // Поиск нужного товара на складе
+            string? cellAddress = house.Find(Item);
+
+            if (cellAddress != null)
+            {
+                this.payload.Add(item, cellAddress);
+                Console.WriteLine($"Нужный товар найден в: {cellAddress}");
+            }
+            else
+            {
+                Console.WriteLine("Данный товар отсутствует на складе");
             }
         }
         return payload;
@@ -335,14 +463,14 @@ public class StorageExecutor
 
 public class StorageHouse
 {
-     private string type;
-     private iDataInputStrategy inputStrategy;
-     private iProcess process;
-     private StorageRoot root;
-     private StorageExecutor storageExecutor;
-     private DocWorks docWorks;
-     public StorageHouse()
-     {
+    private string type;
+    private iDataInputStrategy inputStrategy;
+    private iProcess process;
+    private StorageRoot root;
+    private StorageExecutor storageExecutor;
+    private DocWorks docWorks;
+    public StorageHouse()
+    {
         int rooms = 2, shelves = 1, cells = 2;
         this.root = new StorageRoot(rooms, shelves, cells);
         var storbd = new storRepos();
@@ -353,7 +481,7 @@ public class StorageHouse
         Console.WriteLine("Вы инициализировали систему склада ...");
         Thread.Sleep(1000);
 
-     }
+    }
     void getProcessType()
     {
         Console.WriteLine("Выберите тип процесса. 1-приемка, 2-заказ");
@@ -393,14 +521,14 @@ public class StorageHouse
         }
         this.inputStrategy = inputStrategy;
     }
-     string getMetaData()
-     {
+    string getMetaData()
+    {
         Console.WriteLine("Введите текущую дату");
         string data = Console.ReadLine() + ";";
         Console.WriteLine("Введите свою фамилию");
         data += Console.ReadLine();
         return data;
-     }
+    }
     public void ExecuteProcess()
     {
 
@@ -418,7 +546,8 @@ public class StorageHouse
         string metad = getMetaData();
         string document = docWorks.createDocument(metad, payload);
         bool res = docWorks.saveDocument(document);
-        if (res) {
+        if (res)
+        {
             Console.WriteLine("Завершена работа с процессом!");
         }
     }
@@ -426,13 +555,12 @@ public class StorageHouse
 }
 class Program
 {
-    
+
     static void Main()
     {
         var program = new StorageHouse();
         program.ExecuteProcess();
 
-        
+
     }
 }
-
