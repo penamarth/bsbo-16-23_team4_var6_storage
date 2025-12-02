@@ -1,0 +1,81 @@
+@startuml
+actor Оператор
+
+Оператор -> StorageHouse : ExecuteProcess()
+activate StorageHouse
+
+StorageHouse -> iDataInputStrategy : GetData()
+activate iDataInputStrategy
+iDataInputStrategy --> StorageHouse : data
+deactivate iDataInputStrategy
+
+StorageHouse -> StorageExecutor : ExecuteProcess(process, data)
+activate StorageExecutor
+
+StorageExecutor -> iProcess : Parse(data)
+activate iProcess
+iProcess --> StorageExecutor : void
+deactivate iProcess
+
+StorageExecutor -> iProcess : ExecuteStorageLogic(house)
+activate iProcess
+
+loop для каждого Item
+    iProcess -> IStorage : Find(Item)
+    activate IStorage
+    IStorage -> StorageComposite : Find(Item)
+    activate StorageComposite
+    StorageComposite -> StorageRoot : Find(Item)
+    activate StorageRoot
+    StorageRoot -> StorageRoom : Find(Item)
+    activate StorageRoom
+    StorageRoom -> StorageShelf : Find(Item)
+    activate StorageShelf
+    StorageShelf -> StorageCell : Find(Item)
+    activate StorageCell
+    StorageCell --> StorageShelf : cellAddress / null
+    deactivate StorageCell
+    StorageShelf --> StorageRoom : shelfAddress / null
+    deactivate StorageShelf
+    StorageRoom --> StorageRoot : roomAddress / null
+    deactivate StorageRoom
+    StorageRoot --> StorageComposite : rootAddress / null
+    deactivate StorageRoot
+    StorageComposite --> IStorage : address / null
+    deactivate StorageComposite
+    IStorage --> iProcess : address / null
+    deactivate IStorage
+end
+
+iProcess --> StorageExecutor : payload (Dictionary<Item,string>)
+deactivate iProcess
+
+StorageExecutor -> iReposStor : LoadFromPlacement(payload)
+activate iReposStor
+iReposStor --> StorageExecutor : true
+deactivate iReposStor
+
+StorageExecutor --> StorageHouse : payload
+deactivate StorageExecutor
+
+StorageHouse -> DocWorks : createDocument(metad, payload)
+activate DocWorks
+DocWorks -> iDoc : Create(metad, payload)
+activate iDoc
+iDoc --> DocWorks : document (string)
+deactivate iDoc
+DocWorks --> StorageHouse : document
+deactivate DocWorks
+
+StorageHouse -> DocWorks : saveDocument(document)
+activate DocWorks
+DocWorks -> iReposDoc : SaveDocument(document)
+activate iReposDoc
+iReposDoc --> DocWorks : true
+deactivate iReposDoc
+DocWorks --> StorageHouse : true
+deactivate DocWorks
+
+StorageHouse --> Оператор : Завершение процесса (payload, document_id)
+deactivate StorageHouse
+@enduml
