@@ -21,7 +21,7 @@ StorageExecutor -> iProcess : ExecuteStorageLogic(house)
 activate iProcess
 
 loop для каждого Item
-    iProcess -> IStorage : GetEmpty("Warehouse")
+    iProcess -> IStorage : Defragment("Warehouse")
     activate IStorage
     IStorage -> StorageComposite : Defragment(path)
     activate StorageComposite
