@@ -492,7 +492,7 @@ public class StorageHouse
 
         } else if (this.type == "2")
         {
-
+            process = new Order();
         }
         this.process = process;
     }
