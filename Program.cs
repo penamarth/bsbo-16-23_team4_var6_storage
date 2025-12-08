@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 
@@ -8,6 +9,8 @@ public interface IStorage
     string? GetEmpty(string path); // поиск пустого места
 
     string? Find(Item goods, string path);
+
+    string? Defragment(Item goods, string path); // Дефрагментация
 }
 
 public abstract class StorageComposite : IStorage
@@ -37,6 +40,16 @@ public abstract class StorageComposite : IStorage
         foreach (var child in children)
         {
             var result = child.Find(goods, path);
+            if (result != null)
+                return result;
+        }
+        return null;
+    }
+    public virtual string? Defragment(Item goods, string path)
+    {
+        foreach (var child in children)
+        {
+            var result = child.Defragment(goods, path);
             if (result != null)
                 return result;
         }
@@ -77,6 +90,17 @@ public class StorageCell : IStorage
         {
             isOccupied = false;
             Console.WriteLine($"Товар извлечен из ячейки: {path}/{id}");
+            return $"{path}/{id}";
+        }
+        return null;
+    }
+    public string? Defragment(Item goods, string path)
+    {
+        Console.WriteLine($"Проверка ячейки {path}/{id}");
+        if (isOccupied && goods != content)
+        {
+            isOccupied = true;
+            Console.WriteLine($"Товар перемещён в новую ячейку: {path}/{id}");
             return $"{path}/{id}";
         }
         return null;
@@ -224,6 +248,24 @@ public class OrderDoc : iDoc
             document += t_item;
         }
         Console.WriteLine("Создан документ ЗАКАЗ");
+        Console.WriteLine(document);
+        return document;
+    }
+}
+
+public class DefragmentationDoc : iDoc
+{
+    public string Create(string metad, Dictionary<Item, string> payload)
+    {
+        Console.WriteLine("Создаем документ");
+        Thread.Sleep(1000);
+        string document = $"Была произведена ДЕФРАГМЕНТАЦИЯ склада:\nМетаданные: {metad}\n";
+        foreach (var item in payload)
+        {
+            string t_item = $"Item: {item.Key.Name}-{item.Key.Quantity}  adress: {item.Value}\n";
+            document += t_item;
+        }
+        Console.WriteLine("Создан документ ДЕФРАГМЕНТАЦИИ");
         Console.WriteLine(document);
         return document;
     }
@@ -440,6 +482,76 @@ public class Order : iProcess
     }
 }
 
+public class Defragmentation : iProcess
+{
+    private string batchId;
+    private string date;
+    private string producer;
+    private string manager;
+
+    private List<Item> items = new List<Item>();
+    public Dictionary<Item, string> payload = new Dictionary<Item, string>();
+
+    public void Parse(string data)
+    {
+        var parts = data.Split(';');
+        var dict = new Dictionary<string, string>();
+
+        foreach (var part in parts)
+        {
+            var kv = part.Split('=');
+            if (kv.Length == 2)
+                dict[kv[0]] = kv[1];
+        }
+
+        batchId = dict.ContainsKey("batch") ? dict["batch"] : "не указан";
+        date = dict.ContainsKey("date") ? dict["date"] : "не указана";
+        producer = dict.ContainsKey("producer") ? dict["producer"] : "не указан";
+        manager = dict.ContainsKey("manager") ? dict["manager"] : "не указан";
+
+        if (dict.ContainsKey("items"))
+        {
+            foreach (var item in dict["items"].Split(','))
+            {
+                var kv = item.Split(':');
+                if (kv.Length == 2)
+                {
+                    items.Add(new Item
+                    {
+                        Name = kv[0].Trim(),
+                        Quantity = kv[1].Trim()
+                    });
+                }
+            }
+        }
+    }
+
+    public Dictionary<Item, string> ExecuteStorageLogic(IStorage house)
+    {
+        Console.WriteLine($"Дефрагментация №{batchId}");
+        Console.WriteLine($"Дата: {date}");
+        Console.WriteLine($"Производитель: {producer}");
+        Console.WriteLine($"Менеджер: {manager}");
+        Console.WriteLine("Список товаров:");
+        foreach (var item in items)
+        {
+            Console.WriteLine($"- {item.Name}, {item.Quantity}");
+            // Дефрагментация - перемещение в новую ячейку
+            string? cellAddress = house.Defragment(item, "Warehouse");
+
+            if (cellAddress != null)
+            {
+                this.payload.Add(item, cellAddress);
+                Console.WriteLine($"Дефрагментация выполнена, товар помещён в новую ячейку: {cellAddress}");
+            }
+            else
+            {
+                Console.WriteLine("Нет свободных ячеек для размещения");
+            }
+        }
+        return payload;
+    }
+}
 
 public class StorageExecutor
 {
@@ -477,6 +589,7 @@ public class StorageHouse
         this.storageExecutor = new StorageExecutor(root, storbd);
         var docbd = new docRepos();
         var doc = new AcceptanceDoc();
+        var doc_defragmentation = new DefragmentationDoc();
         this.docWorks = new DocWorks(doc, docbd);
         Console.WriteLine("Вы инициализировали систему склада ...");
         Thread.Sleep(1000);
@@ -484,15 +597,20 @@ public class StorageHouse
     }
     void getProcessType()
     {
-        Console.WriteLine("Выберите тип процесса. 1-приемка, 2-заказ");
+        Console.WriteLine("Выберите тип процесса. 1-приемка, 2-заказ, 3-дефрагментация");
         this.type = Console.ReadLine();
         if (this.type == "1")
         {
             process = new Acceptance();
 
-        } else if (this.type == "2")
+        }
+        else if (this.type == "2")
         {
             process = new Order();
+        }
+        else if (this.type == "3")
+        {
+            process = new Defragmentation();
         }
         this.process = process;
     }
@@ -537,6 +655,27 @@ public class StorageHouse
 
         getProcessType();
         getInputStrategy();
+
+        iDoc doc;
+        switch (type)
+        {
+            case "1": // Приемка
+                doc = new AcceptanceDoc();
+                break;
+            case "2": // Заказ
+                doc = new OrderDoc();
+                break;
+            case "3": // Дефрагментация
+                doc = new DefragmentationDoc();
+                break;
+            default:
+                doc = new AcceptanceDoc(); // По умолчанию
+                break;
+        }
+
+        var docbd = new docRepos();
+        this.docWorks = new DocWorks(doc, docbd);
+
         // Используем выбранную стратегию
         string data = inputStrategy.GetData();
         Thread.Sleep(2000);
