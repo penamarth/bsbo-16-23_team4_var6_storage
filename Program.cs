@@ -7,7 +7,7 @@ public interface IStorage
     bool CanStore();              // проверка, можно ли хранить
     string? GetEmpty(string path); // поиск пустого места
 
-    string ? Find(Item goods, string path);
+    string? Find(Item goods, string path);
 }
 
 public abstract class StorageComposite : IStorage
@@ -424,7 +424,7 @@ public class Order : iProcess
         {
             Console.WriteLine($"- {item.Name}, {item.Quantity}");
             // Поиск нужного товара на складе
-            string? cellAddress = house.Find(Item);
+            string? cellAddress = house.Find(item, "");
 
             if (cellAddress != null)
             {
@@ -489,6 +489,9 @@ public class StorageHouse
         if (this.type == "1")
         {
             process = new Acceptance();
+
+        } else if (this.type == "2")
+        {
 
         }
         this.process = process;
