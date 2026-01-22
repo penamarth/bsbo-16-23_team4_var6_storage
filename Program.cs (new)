@@ -1,0 +1,643 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+
+public interface IStorage
+{
+    bool CanStore();
+    string? GetEmpty(string path, Item goods);
+    string? Find(Item goods, string path);
+    string? Defragment(Item goods, string path);
+}
+
+public abstract class StorageComposite : IStorage
+{
+    protected readonly List<IStorage> children = new();
+
+    public virtual bool CanStore()
+    {
+        foreach (var child in children)
+            if (child.CanStore())
+                return true;
+        return false;
+    }
+
+    public virtual string? GetEmpty(string path, Item goods)
+    {
+        foreach (var child in children)
+        {
+            var result = child.GetEmpty(path, goods);
+            if (result != null)
+                return result;
+        }
+        return null;
+    }
+
+    public virtual string? Find(Item goods, string path)
+    {
+        foreach (var child in children)
+        {
+            var result = child.Find(goods, path);
+            if (result != null)
+                return result;
+        }
+        return null;
+    }
+
+    public virtual string? Defragment(Item goods, string path)
+    {
+        foreach (var child in children)
+        {
+            var result = child.Defragment(goods, path);
+            if (result != null)
+                return result;
+        }
+        return null;
+    }
+}
+
+public class StorageCell : IStorage
+{
+    private bool isOccupied;
+    private readonly string id;
+    private Item content;
+
+    public StorageCell(string id)
+    {
+        this.id = id;
+        isOccupied = false;
+        content = null;
+    }
+
+    public bool CanStore() => !isOccupied;
+
+    public string? GetEmpty(string path, Item goods)
+    {
+        Console.WriteLine($"Проверка ячейки {path}/{id} (занята: {isOccupied})");
+        if (!isOccupied)
+        {
+            isOccupied = true;
+            content = goods;  // сохраняем товар
+            Console.WriteLine($"Выделена: {path}/{id}");
+            return $"{path}/{id}";
+        }
+        return null;
+    }
+
+    public string? Find(Item goods, string path)
+    {
+        Console.WriteLine($"Проверка ячейки {path}/{id}");
+        if (isOccupied && goods.Name == content?.Name && goods.Quantity == content?.Quantity)
+        {
+            isOccupied = false;
+            content = null; // очищаем ячейку
+            Console.WriteLine($"Товар извлечен из ячейки: {path}/{id}");
+            return $"{path}/{id}";
+        }
+        return null;
+    }
+
+    public string? Defragment(Item goods, string path)
+    {
+        Console.WriteLine($"Проверка ячейки {path}/{id}");
+        if (!isOccupied)
+        {
+            isOccupied = true;
+            content = goods; // перемещаем товар
+            Console.WriteLine($"Товар перемещён в новую ячейку: {path}/{id}");
+            return $"{path}/{id}";
+        }
+        return null;
+    }
+}
+
+public class StorageShelf : StorageComposite
+{
+    private readonly string shelfId;
+
+    public StorageShelf(string shelfId) => this.shelfId = shelfId;
+
+    public void AddCell(StorageCell cell) => children.Add(cell);
+
+    public override string? GetEmpty(string path, Item goods)
+    {
+        Console.WriteLine($"Входим на стеллаж {path}/{shelfId}");
+        return base.GetEmpty($"{path}/{shelfId}", goods);
+    }
+
+    public override string? Find(Item goods, string path)
+    {
+        Console.WriteLine($"Входим на стеллаж {path}/{shelfId}");
+        return base.Find(goods, path);
+    }
+
+    public override string? Defragment(Item goods, string path)
+    {
+        Console.WriteLine($"Входим на стеллаж {path}/{shelfId} для дефрагментации");
+        return base.Defragment(goods, path);
+    }
+}
+
+public class StorageRoom : StorageComposite
+{
+    private readonly string roomId;
+
+    public StorageRoom(string roomId) => this.roomId = roomId;
+
+    public void AddShelf(StorageShelf shelf) => children.Add(shelf);
+
+    public override string? GetEmpty(string path, Item goods)
+    {
+        Console.WriteLine($"Входим в комнату {roomId}");
+        return base.GetEmpty($"{path}/{roomId}", goods);
+    }
+
+    public override string? Find(Item goods, string path)
+    {
+        Console.WriteLine($"Входим в комнату {roomId}");
+        return base.Find(goods, path);
+    }
+
+    public override string? Defragment(Item goods, string path)
+    {
+        Console.WriteLine($"Входим в комнату {roomId} для дефрагментации");
+        return base.Defragment(goods, path);
+    }
+}
+
+public class StorageRoot : StorageComposite
+{
+    public StorageRoot(int roomsCount, int shelvesPerRoom, int cellsPerShelf)
+    {
+        for (int r = 1; r <= roomsCount; r++)
+        {
+            var room = new StorageRoom($"Room-{r}");
+            for (int s = 1; s <= shelvesPerRoom; s++)
+            {
+                var shelf = new StorageShelf($"Shelf-{s}");
+                for (int c = 1; c <= cellsPerShelf; c++)
+                    shelf.AddCell(new StorageCell($"Cell-{c}"));
+                room.AddShelf(shelf);
+            }
+            children.Add(room);
+        }
+    }
+
+    public string? GetEmpty(string path, Item goods) => base.GetEmpty(path, goods);
+}
+
+public interface iReposStor { bool SaveToPlacement(Dictionary<Item, string> data); }
+
+public class storRepos : iReposStor
+{
+    public storRepos()
+    {
+        Console.WriteLine("Подключение к бд расположений...");
+        Thread.Sleep(1000);
+    }
+    public bool SaveToPlacement(Dictionary<Item, string> data)
+    {
+        Console.WriteLine("Товары записаны в бд");
+        return true;
+    }
+}
+
+public interface iReposDoc { bool SaveDocument(string document); }
+
+public class docRepos : iReposDoc
+{
+    public docRepos()
+    {
+        Console.WriteLine("Подключение к бд документов...");
+        Thread.Sleep(1000);
+    }
+    public bool SaveDocument(string document)
+    {
+        Console.WriteLine("Документ записан в бд");
+        return true;
+    }
+}
+
+public interface iDoc
+{
+    string Create(string metad, Dictionary<Item, string> payload);
+}
+
+public class AcceptanceDoc : iDoc
+{
+    public string Create(string metad, Dictionary<Item, string> payload)
+    {
+        string doc = $"ПРИЕМКА товаров:\nМетаданные: {metad}\n";
+        foreach (var item in payload)
+            doc += $"Item: {item.Key.Name}-{item.Key.Quantity}  address: {item.Value}\n";
+        Console.WriteLine(doc);
+        return doc;
+    }
+}
+
+public class OrderDoc : iDoc
+{
+    public string Create(string metad, Dictionary<Item, string> payload)
+    {
+        string doc = $"ЗАКАЗ товаров:\nМетаданные: {metad}\n";
+        foreach (var item in payload)
+            doc += $"Item: {item.Key.Name}-{item.Key.Quantity}  address: {item.Value}\n";
+        Console.WriteLine(doc);
+        return doc;
+    }
+}
+
+public class DefragmentationDoc : iDoc
+{
+    public string Create(string metad, Dictionary<Item, string> payload)
+    {
+        string doc = $"ДЕФРАГМЕНТАЦИЯ склада:\nМетаданные: {metad}\n";
+        foreach (var item in payload)
+            doc += $"Item: {item.Key.Name}-{item.Key.Quantity}  address: {item.Value}\n";
+        Console.WriteLine(doc);
+        return doc;
+    }
+}
+
+public class DocWorks
+{
+    private iDoc doc;
+    private iReposDoc docbd;
+    public DocWorks(iDoc doc, iReposDoc docbd)
+    {
+        this.doc = doc;
+        this.docbd = docbd;
+    }
+    public string createDocument(string metad, Dictionary<Item, string> payload)
+    {
+        return doc.Create(metad, payload);
+    }
+    public bool saveDocument(string document)
+    {
+        return docbd.SaveDocument(document);
+    }
+}
+
+public interface iDataInputStrategy { string GetData(); }
+
+public class ExternalSystemInput : iDataInputStrategy
+{
+    string data = "batch=123;date=2025-11-22;producer=Краснодарский_сельхоз;manager=Ivanov;items=мандарины:10кг,апельсины:3кг,яблоки:5кг";
+    public string GetData()
+    {
+        Console.WriteLine("Получение данных из внешней системы...");
+        return data;
+    }
+}
+
+public class QRCodeInput : iDataInputStrategy
+{
+    string data = "batch=123;date=2025-11-22;producer=Краснодарский_сельхоз;items=мандарины:10кг,апельсины:3кг,яблоки:5кг";
+    public string GetData()
+    {
+        Console.WriteLine("Сканирование QR-кода...");
+        return data;
+    }
+}
+
+public class ManualInput : iDataInputStrategy
+{
+    public string GetData()
+    {
+        Console.WriteLine("Введите данные вручную:");
+        return Console.ReadLine();
+    }
+}
+
+public class Item
+{
+    public string Name { get; set; }
+    public string Quantity { get; set; }
+}
+
+public interface iProcess
+{
+    void Parse(string data);
+    Dictionary<Item, string> ExecuteStorageLogic(IStorage house);
+}
+
+public class Acceptance : iProcess
+{
+    private List<Item> items = new List<Item>();
+    public Dictionary<Item, string> payload = new Dictionary<Item, string>();
+    private string batchId, date, producer, manager;
+
+    public void Parse(string data)
+    {
+        var parts = data.Split(';');
+        var dict = new Dictionary<string, string>();
+        foreach (var part in parts)
+        {
+            var kv = part.Split('=');
+            if (kv.Length == 2) dict[kv[0]] = kv[1];
+        }
+        batchId = dict.ContainsKey("batch") ? dict["batch"] : "";
+        date = dict.ContainsKey("date") ? dict["date"] : "";
+        producer = dict.ContainsKey("producer") ? dict["producer"] : "";
+        manager = dict.ContainsKey("manager") ? dict["manager"] : "";
+
+        if (dict.ContainsKey("items"))
+        {
+            foreach (var item in dict["items"].Split(','))
+            {
+                var kv = item.Split(':');
+                if (kv.Length == 2)
+                    items.Add(new Item { Name = kv[0].Trim(), Quantity = kv[1].Trim() });
+            }
+        }
+    }
+
+    public Dictionary<Item, string> ExecuteStorageLogic(IStorage house)
+    {
+        foreach (var item in items)
+        {
+            string? cellAddress = house.GetEmpty("Warehouse", item);
+            if (cellAddress != null) payload.Add(item, cellAddress);
+        }
+        return payload;
+    }
+}
+
+public class Order : iProcess
+{
+    private List<Item> items = new List<Item>();
+    public Dictionary<Item, string> payload = new Dictionary<Item, string>();
+
+    public void Parse(string data)
+    {
+        var parts = data.Split(';');
+        var dict = new Dictionary<string, string>();
+        foreach (var part in parts)
+        {
+            var kv = part.Split('=');
+            if (kv.Length == 2) dict[kv[0]] = kv[1];
+        }
+
+        if (dict.ContainsKey("items"))
+        {
+            foreach (var item in dict["items"].Split(','))
+            {
+                var kv = item.Split(':');
+                if (kv.Length == 2)
+                    items.Add(new Item { Name = kv[0].Trim(), Quantity = kv[1].Trim() });
+            }
+        }
+    }
+
+    public Dictionary<Item, string> ExecuteStorageLogic(IStorage house)
+    {
+        foreach (var item in items)
+        {
+            string? cellAddress = house.Find(item, "");
+            if (cellAddress != null) payload.Add(item, cellAddress);
+        }
+        return payload;
+    }
+}
+
+public class Defragmentation : iProcess
+{
+    private List<Item> items = new List<Item>();
+    public Dictionary<Item, string> payload = new Dictionary<Item, string>();
+
+    public void Parse(string data)
+    {
+        var parts = data.Split(';');
+        var dict = new Dictionary<string, string>();
+        foreach (var part in parts)
+        {
+            var kv = part.Split('=');
+            if (kv.Length == 2) dict[kv[0]] = kv[1];
+        }
+
+        if (dict.ContainsKey("items"))
+        {
+            foreach (var item in dict["items"].Split(','))
+            {
+                var kv = item.Split(':');
+                if (kv.Length == 2)
+                    items.Add(new Item { Name = kv[0].Trim(), Quantity = kv[1].Trim() });
+            }
+        }
+    }
+
+    public Dictionary<Item, string> ExecuteStorageLogic(IStorage house)
+    {
+        foreach (var item in items)
+        {
+            string? cellAddress = house.Defragment(item, "Warehouse");
+            if (cellAddress != null) payload.Add(item, cellAddress);
+        }
+        return payload;
+    }
+}
+
+public class StorageExecutor
+{
+    private IStorage house;
+    private iReposStor storbd;
+    public StorageExecutor(IStorage house, iReposStor storbd)
+    {
+        this.house = house;
+        this.storbd = storbd;
+    }
+
+    public Dictionary<Item, string> ExecuteProcess(iProcess process, string data)
+    {
+        process.Parse(data);
+        var payload = process.ExecuteStorageLogic(house);
+        storbd.SaveToPlacement(payload);
+        return payload;
+    }
+}
+
+public class StorageHouse
+{
+    private string type;
+    private iDataInputStrategy inputStrategy;
+    private iProcess process;
+    private StorageRoot root;
+    private StorageExecutor storageExecutor;
+    private DocWorks docWorks;
+
+    public StorageHouse()
+    {
+        root = new StorageRoot(2, 1, 2);
+        var storbd = new storRepos();
+        storageExecutor = new StorageExecutor(root, storbd);
+        docWorks = new DocWorks(new AcceptanceDoc(), new docRepos());
+        Console.WriteLine("Система склада инициализирована.");
+    }
+
+    private void getProcessType()
+    {
+        Console.WriteLine("Выберите процесс: 1-приемка, 2-заказ, 3-дефрагментация, 4-отгрузка");
+        type = Console.ReadLine();
+        process = type switch
+        {
+            "1" => new Acceptance(),
+            "2" => new Order(),
+            "3" => new Defragmentation(),
+			"4" => new Shipment(),
+            _ => new Acceptance()
+        };
+    }
+
+    private void getInputStrategy()
+    {
+        Console.WriteLine("Выбор данных: 1-внешняя система, 2-QR, 3-вручную");
+        string choice = Console.ReadLine();
+        inputStrategy = choice switch
+        {
+            "1" => new ExternalSystemInput(),
+            "2" => new QRCodeInput(),
+            _ => new ManualInput()
+        };
+    }
+
+    private string getMetaData()
+    {
+        Console.WriteLine("Введите текущую дату:");
+        string data = Console.ReadLine() + ";";
+        Console.WriteLine("Введите фамилию:");
+        data += Console.ReadLine();
+        return data;
+    }
+
+    public void ExecuteProcess()
+    {
+        getProcessType();
+        getInputStrategy();
+		if (type == "4")
+		{
+			Console.WriteLine("Перед отгрузкой выполняем приемку товаров на склад...");
+			var defaultAcceptance = new Acceptance();
+			string preloadData = inputStrategy.GetData(); // используем стратегию ввода
+			defaultAcceptance.Parse(preloadData);
+			storageExecutor.ExecuteProcess(defaultAcceptance, preloadData);
+			Console.WriteLine("Приемка завершена. Товары на складе готовы к отгрузке.");
+		}
+        string data = inputStrategy.GetData();
+		
+        var payload = storageExecutor.ExecuteProcess(process, data);
+
+        string metad = getMetaData();
+        docWorks = type switch
+        {
+            "1" => new DocWorks(new AcceptanceDoc(), new docRepos()),
+            "2" => new DocWorks(new OrderDoc(), new docRepos()),
+            "3" => new DocWorks(new DefragmentationDoc(), new docRepos()),
+			"4" => new DocWorks(new ShipmentDoc(), new docRepos()),
+            _ => new DocWorks(new AcceptanceDoc(), new docRepos())
+        };
+		
+
+        string document = docWorks.createDocument(metad, payload);
+        docWorks.saveDocument(document);
+        Console.WriteLine("Процесс завершён!");
+    }
+}
+public class Shipment : iProcess
+{
+    private string batchId;
+    private string date;
+    private string customer;
+    private string manager;
+
+    private List<Item> items = new List<Item>();
+    public Dictionary<Item, string> payload = new Dictionary<Item, string>();
+
+    public void Parse(string data)
+    {
+        var parts = data.Split(';');
+        var dict = new Dictionary<string, string>();
+
+        foreach (var part in parts)
+        {
+            var kv = part.Split('=');
+            if (kv.Length == 2)
+                dict[kv[0]] = kv[1];
+        }
+
+        batchId = dict.ContainsKey("batch") ? dict["batch"] : "не указан";
+        date = dict.ContainsKey("date") ? dict["date"] : "не указана";
+        customer = dict.ContainsKey("customer") ? dict["customer"] : "не указан";
+        manager = dict.ContainsKey("manager") ? dict["manager"] : "не указан";
+
+        if (dict.ContainsKey("items"))
+        {
+            foreach (var item in dict["items"].Split(','))
+            {
+                var kv = item.Split(':');
+                if (kv.Length == 2)
+                {
+                    items.Add(new Item
+                    {
+                        Name = kv[0].Trim(),
+                        Quantity = kv[1].Trim()
+                    });
+                }
+            }
+        }
+    }
+
+    public Dictionary<Item, string> ExecuteStorageLogic(IStorage house)
+    {
+        Console.WriteLine($"Отгрузка №{batchId}");
+        Console.WriteLine($"Дата: {date}");
+        Console.WriteLine($"Заказчик: {customer}");
+        Console.WriteLine($"Менеджер: {manager}");
+        Console.WriteLine("Список товаров для отгрузки:");
+
+        foreach (var item in items)
+        {
+            Console.WriteLine($"- {item.Name}, {item.Quantity}");
+            // Поиск товара на складе
+            string? cellAddress = house.Find(item, "");
+
+            if (cellAddress != null)
+            {
+                this.payload.Add(item, cellAddress);
+                Console.WriteLine($"Товар найден в: {cellAddress} и готов к отгрузке");
+
+            }
+            else
+            {
+                Console.WriteLine("Товар отсутствует на складе");
+            }
+        }
+        return payload;
+    }
+}
+
+public class ShipmentDoc : iDoc
+{
+    public string Create(string metad, Dictionary<Item, string> payload)
+    {
+        Console.WriteLine("Создаем документ отгрузки");
+        Thread.Sleep(1000);
+        string document = $"Была произведена ОТГРУЗКА товаров:\nМетаданные: {metad}\n";
+        foreach (var item in payload)
+        {
+            string t_item = $"Item: {item.Key.Name}-{item.Key.Quantity}  adress: {item.Value}\n";
+            document += t_item;
+        }
+        Console.WriteLine("Создан документ ОТГРУЗКИ");
+        Console.WriteLine(document);
+        return document;
+    }
+}
+
+class Program
+{
+    static void Main()
+    {
+        var program = new StorageHouse();
+        program.ExecuteProcess();
+    }
+}
